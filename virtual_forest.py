@@ -60,13 +60,14 @@ st.markdown(
     .forest {
         background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470');
         background-size: cover;
-        padding: 20px;
         border-radius: 12px;
         min-height: 500px;
         position: relative;
+        overflow: hidden;
     }
     .tree {
         position: absolute;
+        opacity: 0.95;
     }
     </style>
     """,
@@ -98,9 +99,9 @@ st.markdown(f"<div class='center big-counter'>🌱 Real Trees Planted: {st.sessi
 st.subheader("Your Virtual Forest")
 
 tree_images = [
-    "https://img.icons8.com/color/96/forest.png",
-    "https://img.icons8.com/color/96/deciduous-tree.png",
-    "https://img.icons8.com/color/96/palm-tree.png"
+    "https://img.icons8.com/fluency/96/deciduous-tree.png",
+    "https://img.icons8.com/fluency/96/tree.png",
+    "https://img.icons8.com/fluency/96/coniferous-tree.png"
 ]
 
 forest_html = '<div class="forest">'
@@ -108,7 +109,13 @@ for i in range(st.session_state.virtual_trees):
     tree_url = random.choice(tree_images)
     x = random.randint(0, 90)
     y = random.randint(0, 90)
-    forest_html += f'<img src="{tree_url}" class="tree" style="left:{x}%; top:{y}%; width:40px;">'
+    forest_html += f'<img src="{tree_url}" class="tree" style="left:{x}%; top:{y}%; width:50px;">'
 forest_html += '</div>'
 
 st.markdown(forest_html, unsafe_allow_html=True)
+
+# ---------- DONATION SECTION ----------
+st.subheader("💚 Support the Forest")
+if st.button("Donate $5 (Mock)", use_container_width=True):
+    # Replace with real Stripe checkout integration
+    st.success("✅ Thank you for your donation! (mock transaction)")
