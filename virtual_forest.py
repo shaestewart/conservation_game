@@ -1,121 +1,98 @@
 import streamlit as st
-import pandas as pd
-import requests
-from pathlib import Path
+from PIL import Image, ImageDraw
 import random
+import os
 
-# ---------- CONFIG ----------
-st.set_page_config(page_title="VHREC Virtual Forest", layout="wide")
+# ------------------------------
+# CONFIG
+# ------------------------------
+st.set_page_config(page_title="VHREC Virtual Forest 🌳", layout="wide")
 
-DATA_FILE = Path("tree_data.csv")
-TREES_PER_REAL = 50  # 50 virtual trees = 1 real tree
-API_URL = "https://api.1clickimpact.com/v1/trees"
+# Load background (replace with your own forest bg)
+BACKGROUND_PATH = "assets/forest_bg.png"
+if os.path.exists(BACKGROUND_PATH):
+    background = Image.open(BACKGROUND_PATH).convert("RGBA")
+else:
+    # fallback: green gradient background
+    background = Image.new("RGBA", (1000, 700), (100, 180, 100, 255))
+    draw = ImageDraw.Draw(background)
+    for y in range(700):
+        shade = 100 + int(80 * (y / 700))
+        draw.line([(0, y), (1000, y)], fill=(shade, 180, shade, 255))
 
-# ---------- DATA STORAGE ----------
-if not DATA_FILE.exists():
-    pd.DataFrame({"virtual_trees": [0], "real_trees": [0]}).to_csv(DATA_FILE, index=False)
-
-def load_data():
-    return pd.read_csv(DATA_FILE).iloc[0].to_dict()
-
-def save_data(virtual, real):
-    pd.DataFrame({"virtual_trees": [virtual], "real_trees": [real]}).to_csv(DATA_FILE, index=False)
-
-# ---------- API CALL ----------
-def plant_real_tree(num):
-    try:
-        headers = {"Authorization": f"Bearer {st.secrets['1CLICKIMPACT_API_KEY']}"}
-        payload = {"trees": num}
-        r = requests.post(API_URL, headers=headers, json=payload)
-        if r.status_code == 200:
-            return True
-        else:
-            st.error(f"API Error: {r.status_code} - {r.text}")
-            return False
-    except Exception as e:
-        st.error(f"API request failed: {e}")
-        return False
-
-# ---------- STATE ----------
-data = load_data()
-if "virtual_trees" not in st.session_state:
-    st.session_state.virtual_trees = data["virtual_trees"]
-    st.session_state.real_trees = data["real_trees"]
-
-# ---------- UI ----------
-st.markdown(
-    """
-    <style>
-    .center {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-    }
-    .big-counter {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #2E7D32;
-    }
-    .forest {
-        background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470');
-        background-size: cover;
-        border-radius: 12px;
-        min-height: 500px;
-        position: relative;
-        overflow: hidden;
-    }
-    .tree {
-        position: absolute;
-        opacity: 0.95;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-st.title("🌍 Virtual Forest")
-st.markdown("Click the button to plant trees. Every **50 virtual trees = 1 real tree planted!**")
-
-# ---------- BUTTON ----------
-if st.button("🌳 Plant a Tree", use_container_width=True):
-    st.session_state.virtual_trees += 1
-
-    # Check if we should plant real tree(s)
-    expected_real = st.session_state.virtual_trees // TREES_PER_REAL
-    if expected_real > st.session_state.real_trees:
-        to_plant = expected_real - st.session_state.real_trees
-        success = plant_real_tree(to_plant)
-        if success:
-            st.session_state.real_trees = expected_real
-
-    save_data(st.session_state.virtual_trees, st.session_state.real_trees)
-
-# ---------- COUNTERS ----------
-st.markdown(f"<div class='center big-counter'>🌳 Virtual Trees: {st.session_state.virtual_trees}</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='center big-counter'>🌱 Real Trees Planted: {st.session_state.real_trees}</div>", unsafe_allow_html=True)
-
-# ---------- FOREST VISUAL ----------
-st.subheader("Your Virtual Forest")
-
-tree_images = [
-    "https://img.icons8.com/fluency/96/deciduous-tree.png",
-    "https://img.icons8.com/fluency/96/tree.png",
-    "https://img.icons8.com/fluency/96/coniferous-tree.png"
+# Load tree assets
+TREE_PATHS = [
+    "assets/tree1.png",  # pine
+    "assets/tree2.png",  # oak
+    "assets/tree3.png",  # birch
 ]
+tree_images = [Image.open(p).convert("RGBA") for p in TREE_PATHS if os.path.exists(p)]
 
-forest_html = '<div class="forest">'
-for i in range(st.session_state.virtual_trees):
-    tree_url = random.choice(tree_images)
-    x = random.randint(0, 90)
-    y = random.randint(0, 90)
-    forest_html += f'<img src="{tree_url}" class="tree" style="left:{x}%; top:{y}%; width:50px;">'
-forest_html += '</div>'
+if not tree_images:
+    st.error("⚠️ No tree assets found in /assets. Add some PNGs with transparent backgrounds.")
+    st.stop()
 
-st.markdown(forest_html, unsafe_allow_html=True)
+# ------------------------------
+# SESSION STATE
+# ------------------------------
+if "forest" not in st.session_state:
+    st.session_state.forest = []
+if "virtual_count" not in st.session_state:
+    st.session_state.virtual_count = 0
+if "real_count" not in st.session_state:
+    st.session_state.real_count = 0
 
-# ---------- DONATION SECTION ----------
-st.subheader("💚 Support the Forest")
-if st.button("Donate $5 (Mock)", use_container_width=True):
-    # Replace with real Stripe checkout integration
-    st.success("✅ Thank you for your donation! (mock transaction)")
+# ------------------------------
+# FUNCTIONS
+# ------------------------------
+def plant_tree():
+    """Add a new tree to the forest."""
+    img = random.choice(tree_images)
+    scale = random.uniform(0.6, 1.4)
+    new_tree = {
+        "img": img,
+        "x": random.randint(50, background.width - 150),
+        "y": random.randint(int(background.height * 0.5), background.height - 200),
+        "scale": scale
+    }
+    st.session_state.forest.append(new_tree)
+    st.session_state.virtual_count += 1
+
+    # Every 50 virtual = 1 real tree
+    if st.session_state.virtual_count % 50 == 0:
+        st.session_state.real_count += 1
+        # 🔌 Here you’d call 1ClickImpact API with st.secrets["api_key"]
+
+
+def render_forest():
+    """Render the forest image with all planted trees."""
+    canvas = background.copy()
+    for tree in st.session_state.forest:
+        t_img = tree["img"].resize(
+            (int(tree["img"].width * tree["scale"]), int(tree["img"].height * tree["scale"]))
+        )
+        canvas.paste(t_img, (tree["x"], tree["y"]), t_img)
+    return canvas
+
+# ------------------------------
+# UI
+# ------------------------------
+st.title("🌳 Virtual Forest")
+st.write("Plant virtual trees and we’ll plant real ones! Every 50 virtual = 1 real tree.")
+
+col1, col2 = st.columns([2,1])
+
+with col1:
+    if st.button("🌱 Plant a Tree"):
+        plant_tree()
+
+    forest_img = render_forest()
+    st.image(forest_img, use_container_width=True)
+
+with col2:
+    st.metric("🌲 Virtual Trees", st.session_state.virtual_count)
+    st.metric("🌍 Real Trees Committed", st.session_state.real_count)
+
+    st.markdown("---")
+    st.markdown("💚 Want to help even more?")
+    st.link_button("Donate $1 to Plant a Tree", "https://your-donation-link-here")
